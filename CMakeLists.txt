@@ -6,9 +6,11 @@ set(CMAKE_CXX_STANDARD 17)
 
 set(Vulkan_Include_Dirs "lib/vulkan-sdk/Include")
 
-set(VULKAN_LIBRARY "lib/vulkan-sdk/Lib/vulkan-1.lib")
+set(VULKAN_LIBRARY "${CMAKE_SOURCE_DIR}/lib/vulkan-sdk/Lib/vulkan-1.lib")
 
-set(GLFW_LIBRARY "lib/glfw/lib-vc2019/glfw3dll.lib")
+set(GLFW_LIBRARY "${CMAKE_SOURCE_DIR}/lib/glfw/lib-vc2019/glfw3dll.lib")
+message(---------------${CMAKE_SOURCE_DIR}---------------------)
+message(---------------${VULKAN_LIBRARY}---------------------)
 
 include_directories(${Vulkan_Include_Dirs})
 
@@ -18,5 +20,9 @@ message(STATUS "Vulkan Include dirs: ${Vulkan_INCLUDE_DIRS} and libs: ${LIBS}")
 include_directories("lib/glfw/include")
 include_directories("lib/glm")
 add_subdirectory("lib/glm")
+
+# set_property(GLOBAL PROPERTY DLL_DIRECTORY "${CMAKE_SOURCE_DIR}/lib/glfw/lib-vc2019")
+# list(APPEND CMAKE_PROGRAM_PATH "${CMAKE_SOURCE_DIR}/lib/glfw/lib-vc2019")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/lib/glfw/lib-vc2019")
 
 add_subdirectory(DrawingTriangle)
