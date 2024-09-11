@@ -5,9 +5,17 @@
 #include <stdexcept>
 #include <cstdlib>
 #include <vector>
+#include <optional>
 
-const uint32_t WIDTH = 800;
-const uint32_t HEIGHT = 600;
+struct QueueFamilyIndices
+{
+	std::optional<uint32_t> graphicsFamily;
+
+	bool isComplete()
+	{
+		return graphicsFamily.has_value();
+	}
+};
 
 VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger)
 {
@@ -259,7 +267,32 @@ private:
 		vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
 
 		return deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && deviceFeatures.geometryShader;*/
-		return true;
+		QueueFamilyIndices indices = findQueueFamilies(device);
+		return indices.isComplete();
+	}
+
+	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device)
+	{
+		QueueFamilyIndices indices;
+
+		uint32_t queueFamilyCnt = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCnt, nullptr);
+
+		std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCnt);
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCnt, queueFamilies.data());
+
+		int i = 0;
+		for (const auto& queueFamily : queueFamilies)
+		{
+			if (queueFamily.queueCount & VK_QUEUE_GRAPHICS_BIT)
+			{
+				indices.graphicsFamily = i;
+				break;
+			}
+			++i;
+		}
+
+		return indices;
 	}
 
 	void mainLoop()
