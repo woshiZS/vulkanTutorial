@@ -20,7 +20,7 @@
   * Presentation modes(**这个尤为重要**)
 * 查询extension support的过程是类似的，需要注意的是只有extension支持了，我们才需要去看device是否有和surface相符的swapchain，因此swapchain support的检查需要放在extension检查后面，extension检查好了以后，我们才需要检查swapchain support。
 
-### Choosing the Right Settings for SwapChain
+#### Choosing the Right Settings for SwapChain
 
 * Choosing the right surface Format
 
@@ -54,9 +54,46 @@ FIFO会等待下一个vertical blank的到来再去切换显示的data source.
 
 本质是选择swapchain中image view的resolution，width, height的范围定义在```VkSurfaceCapabilitiesKHR```中，一般来说在```currentExtent```中定义好了，如果设置为uint32_t的最大值，用户可以自行按照window进行匹配。
 
-**Vulkan设置swap extent的单位是pixel, 对于苹果设备的视网膜分辨率，pixel数量可能远大于屏幕坐标，因此我们需要```glfwGetFramebufferSize```提前查询一下pixel width和pixel height**
+**Vulkan设置swap extent的单位是pixel, 对于苹果设备的视网膜分辨率，pixel数量可能远大于屏幕坐标，因此我们需要```glfwGetFramebufferSize```提前查询一下pixel width和pixel height**, 最后利用VkSurfaceCapabilitiesKHR中的数据（min/max height/width）做一下clamp即可。
 
+#### Creating the Swap Chain
 
+利用上述信息补充createInfo进行创建，额外提到的几点：
+
+* imageSharingMode
+* preTransform
+* compositeAlpha
+* oldSwapchain
+
+知道这几个对应的含义就ok
+
+### Image Views
+
+其实就是Image不能直接用来draw东西，需要在Image的基础上创建一个类似View的东西，在某种程度上和string_view有点像
+
+## Graphics Pipeline Basics
+
+### Introduction
+
+掠过，讲的一些尝试性质的东西
+
+### Shader Module
+
+* 一帮从glsl到spir-v，使用glslc编译
+* shader module只是一个wrapper，真正执行编译和链接的时候是pipeline build的时候， 因此recreate pipeline的时候shader module可以销毁并且重新创建
+* 另外有一点要提到的就是```pSpecializationInfo```，这个可以用来指定const varialble的值，const variable的if操作可以被编译器优化掉，因此可以利用const variable使得一个shader module有不同的表现行为，因此，可以多利用这种方式而非利用variable来做condition branch.
+
+### Fixed Functions
+
+* 除了需要配置可编程阶段之外，因为pipeline在创建之后immutable的缘故，我们应该在创建的时候将fixed fucntion stage也配置好。
+
+* 有一些属性可以在不重新创建pipeline的情况下进行修改，同样的，你也需要在每次draw之前手动去设置
+
+  * size of viewport
+  * line width
+  * blend constant
+
+  需要创建额外的dynamic statecreate info，更多详细信息参考[vulkan spec](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDynamicState.html)
 
 
 
