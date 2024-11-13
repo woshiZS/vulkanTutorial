@@ -106,6 +106,7 @@ private:
 		createLogicalDevice();
 		createSwapChain();
 		createImageViews();
+		createRenderPass();
 		createGraphicsPipeline();
 	}
 
@@ -728,8 +729,72 @@ private:
 			throw std::runtime_error("Failed to create pipeline layout!");
 		}
 
+		VkGraphicsPipelineCreateInfo pipelineInfo{};
+		pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+		pipelineInfo.stageCount = 2;
+		pipelineInfo.pStages = shaderStages;
+		pipelineInfo.pVertexInputState = &vertexInputInfo;
+		pipelineInfo.pInputAssemblyState = &inputAssembly;
+		pipelineInfo.pTessellationState = nullptr;
+		pipelineInfo.pViewportState = &viewportCreateInfo;
+		pipelineInfo.pRasterizationState = &rasterizeInfo;
+		pipelineInfo.pMultisampleState = &multisampleInfo;
+		pipelineInfo.pDepthStencilState = nullptr;
+		pipelineInfo.pColorBlendState = &colorBlending;
+		pipelineInfo.pDynamicState = &dynamicStateInfo;
+
+		pipelineInfo.layout = pipelineLayout;
+		pipelineInfo.renderPass = renderPass;
+		pipelineInfo.subpass = 0;
+
+		pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+		pipelineInfo.basePipelineIndex = -1;
+
+		if(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS)
+		{
+			throw std::runtime_error("Failed to create the graphics pipeline!");
+		}
+
+		std::cout << "Successfully create the graphics pipeline!" << std::endl;
+
 		vkDestroyShaderModule(device, vertShaderModule, nullptr);
 		vkDestroyShaderModule(device, fragShaderModule, nullptr);
+	}
+
+	void createRenderPass()
+	{
+		VkAttachmentDescription colorAttachment{};
+		colorAttachment.format = swapChainImageFormat;
+		colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT; // For anti-aliasing purposes
+		colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; // load previous, clear, dont'care
+		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE; // store or not
+		colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; // Images to presented in the swap chain.
+		
+		VkAttachmentReference colorAttachmentRef{};
+		colorAttachmentRef.attachment = 0;
+		colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		
+		// Could specified all the input attachment 
+		VkSubpassDescription subpass{};
+		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		subpass.colorAttachmentCount = 1;
+		subpass.pColorAttachments = &colorAttachmentRef; // referenced to fragment shader with layout(location = ...)
+
+		VkRenderPassCreateInfo createInfo{};
+		createInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+		createInfo.attachmentCount = 1;
+		createInfo.pAttachments = &colorAttachment;
+		createInfo.subpassCount = 1;
+		createInfo.pSubpasses = &subpass;
+
+
+		if (vkCreateRenderPass(device, &createInfo, nullptr, &renderPass) != VK_SUCCESS)
+		{
+			throw std::runtime_error("Failed to create render pass!");
+		}
 	}
 
 	VkShaderModule createShaderModule(const std::vector<char>& code)
@@ -739,7 +804,7 @@ private:
 		createInfo.codeSize = code.size();
 		createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
 		VkShaderModule shaderModule;
-		if (!vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS)
+		if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS)
 		{
 			throw std::runtime_error("Failed to create shader module!");
 		}
@@ -756,7 +821,9 @@ private:
 
 	void cleanup()
 	{
+		vkDestroyPipeline(device, graphicsPipeline, nullptr);
 		vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+		vkDestroyRenderPass(device, renderPass, nullptr);
 		for (size_t i = 0; i < swapChainImageViews.size(); ++i)
 		{
 			vkDestroyImageView(device, swapChainImageViews[i], nullptr);
@@ -790,7 +857,10 @@ private:
 	VkExtent2D swapChainExtent;
 	std::vector<VkImage> swapChainImages;
 	std::vector<VkImageView> swapChainImageViews;
+	VkRenderPass renderPass;
 	VkPipelineLayout pipelineLayout;
+
+	VkPipeline graphicsPipeline;
 
 	const uint32_t WIDTH = 800;
 	const uint32_t HEIGHT = 600;

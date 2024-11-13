@@ -95,7 +95,20 @@ FIFO会等待下一个vertical blank的到来再去切换显示的data source.
 
   需要创建额外的dynamic statecreate info，更多详细信息参考[vulkan spec](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDynamicState.html)
 
+* 所有需要配置的阶段这里稍微列一下，过于冗长，看到关键词去搜索即可
 
+  * Vertex Input
+  * Input Assembly
+  * Viewports and scissors 
+  * Rasterizer
+  * Multisampling
+  * Depth and stencil testing
+  * Color blending
+  * Pipeline layout (for uniform usage)
+
+### Render Passes
+
+* 在创建pipeline之前，我们需要告诉vulkan需要的framebuffer attachment信息（不太懂教程为什么把这段放在pipeline后面）
 
 ​	
 
