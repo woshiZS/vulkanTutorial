@@ -108,6 +108,9 @@ private:
 		createImageViews();
 		createRenderPass();
 		createGraphicsPipeline();
+		createFramebuffers();
+		createCommandPool();
+		createCommandBuffer();
 	}
 
 	void createInstance()
@@ -357,7 +360,7 @@ private:
 		return deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && deviceFeatures.geometryShader;*/
 
 		// could be cached
-		QueueFamilyIndices indices = findQueueFamilies(device);
+		currentQueueFamilyIndices = findQueueFamilies(device);
 
 		bool extensionSupported = checkDeviceExtensionSupport(device);
 
@@ -368,7 +371,7 @@ private:
 			swapChainAdequate = !details.formats.empty() && !details.presentModes.empty();
 		}
 
-		return indices.isComplete() && extensionSupported && swapChainAdequate;
+		return currentQueueFamilyIndices.isComplete() && extensionSupported && swapChainAdequate;
 	}
 
 	bool checkDeviceExtensionSupport(VkPhysicalDevice device)
@@ -655,24 +658,24 @@ private:
 		inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 		inputAssembly.primitiveRestartEnable = VK_FALSE; // if set to VK_TRUE, we can use index buffer to specify triange vertices.
 
-		VkViewport viewport{};
-		viewport.x = 0.f;
-		viewport.y = 0.f;
-		viewport.width = static_cast<float>(swapChainExtent.width);
-		viewport.height = static_cast<float>(swapChainExtent.height);
-		viewport.minDepth = 0.0f;
-		viewport.maxDepth = 1.0f; // for depth buffer range
+		//VkViewport viewport{};
+		//viewport.x = 0.f;
+		//viewport.y = 0.f;
+		//viewport.width = static_cast<float>(swapChainExtent.width);
+		//viewport.height = static_cast<float>(swapChainExtent.height);
+		//viewport.minDepth = 0.0f;
+		//viewport.maxDepth = 1.0f; // for depth buffer range
 
-		VkRect2D scissor{};
-		scissor.offset = { 0, 0 };
-		scissor.extent = swapChainExtent;
+		//VkRect2D scissor{};
+		//scissor.offset = { 0, 0 };
+		//scissor.extent = swapChainExtent;
 
-		VkPipelineViewportStateCreateInfo viewportCreateInfo{};
-		viewportCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-		viewportCreateInfo.viewportCount = 1;
-		viewportCreateInfo.scissorCount = 1;
-		viewportCreateInfo.pViewports = &viewport;
-		viewportCreateInfo.pScissors = &scissor;
+		//VkPipelineViewportStateCreateInfo viewportCreateInfo{};
+		//viewportCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+		//viewportCreateInfo.viewportCount = 1;
+		//viewportCreateInfo.scissorCount = 1;
+		//viewportCreateInfo.pViewports = &viewport;
+		//viewportCreateInfo.pScissors = &scissor;
 
 		VkPipelineRasterizationStateCreateInfo rasterizeInfo{};
 		rasterizeInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
@@ -736,7 +739,7 @@ private:
 		pipelineInfo.pVertexInputState = &vertexInputInfo;
 		pipelineInfo.pInputAssemblyState = &inputAssembly;
 		pipelineInfo.pTessellationState = nullptr;
-		pipelineInfo.pViewportState = &viewportCreateInfo;
+		/*pipelineInfo.pViewportState = &viewportCreateInfo;*/
 		pipelineInfo.pRasterizationState = &rasterizeInfo;
 		pipelineInfo.pMultisampleState = &multisampleInfo;
 		pipelineInfo.pDepthStencilState = nullptr;
@@ -797,6 +800,110 @@ private:
 		}
 	}
 
+	void createFramebuffers()
+	{
+		swapChainFramebuffers.resize(swapChainImageViews.size());
+
+		for (size_t i = 0; i < swapChainImageViews.size(); ++i)
+		{
+			VkImageView attachments[] = { swapChainImageViews[i] };
+			VkFramebufferCreateInfo createInfo{};
+			createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+			createInfo.renderPass = renderPass;
+			createInfo.attachmentCount = 1;
+			createInfo.pAttachments = attachments;
+			createInfo.width = swapChainExtent.width;
+			createInfo.height = swapChainExtent.height;
+			createInfo.layers = 1;
+
+			if (vkCreateFramebuffer(device, &createInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS)
+			{
+				throw std::runtime_error("Failed to create frame buffer");
+			}
+		}
+			
+ 	}
+
+	void createCommandPool()
+	{
+		VkCommandPoolCreateInfo createInfo{};
+		createInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+		createInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+		createInfo.queueFamilyIndex = currentQueueFamilyIndices.graphicsFamily.value();
+		//vkCreateCommandPool
+		if (vkCreateCommandPool(device, &createInfo, nullptr, &commandPool) != VK_SUCCESS)
+		{
+			throw std::runtime_error("Failed to create command pool!");
+		}
+	}
+
+	void createCommandBuffer()
+	{
+		VkCommandBufferAllocateInfo allocInfo{};
+		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		allocInfo.commandPool = commandPool;
+		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		allocInfo.commandBufferCount = 1;
+
+		if (vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer) != VK_SUCCESS)
+		{
+			throw std::runtime_error("Failed to create command buffer!");
+		}
+	}
+
+	void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t swapChainImageIndex)
+	{
+		VkCommandBufferBeginInfo beginInfo{};
+		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		beginInfo.flags = 0;
+		beginInfo.pInheritanceInfo = nullptr;
+
+		if (!vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
+		{
+			throw std::runtime_error("Failed to begin recording command buffer");
+		}
+
+		VkRenderPassBeginInfo renderPassBeginInfo{};
+		renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		renderPassBeginInfo.renderPass = renderPass;
+		renderPassBeginInfo.framebuffer = swapChainFramebuffers[swapChainImageIndex];
+		renderPassBeginInfo.renderArea.extent = swapChainExtent;
+		renderPassBeginInfo.renderArea.offset = { 0, 0 };
+		VkClearValue renderPassClearValue{};
+		renderPassClearValue.color = { 0.f, 0.f, 0.f, 1.f };
+		renderPassBeginInfo.clearValueCount = 1;
+		renderPassBeginInfo.pClearValues = &renderPassClearValue;
+
+		vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+		
+		// Bind the graphics pipeline
+		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+		// We need to set dynamic property, cause we add it to dynamic props in the fixed function stages.
+		VkViewport viewport{};
+		viewport.width = swapChainExtent.width;
+		viewport.height = swapChainExtent.height;
+		viewport.x = 0.f;
+		viewport.y = 0.f;
+		viewport.minDepth = 0.f;
+		viewport.maxDepth = 1.f;
+		vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+		
+		VkRect2D scissor{};
+		scissor.offset = { 0, 0 };
+		scissor.extent = swapChainExtent;
+		vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+		// final draw commands
+		vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+
+		if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
+		{
+			throw std::runtime_error("Failed to record render commands to command buffer");
+		}
+		
+	}
+
 	VkShaderModule createShaderModule(const std::vector<char>& code)
 	{
 		VkShaderModuleCreateInfo createInfo{};
@@ -821,6 +928,12 @@ private:
 
 	void cleanup()
 	{
+		vkDestroyCommandPool(device, commandPool, nullptr);
+		for (auto& framebuffer : swapChainFramebuffers)
+		{
+			vkDestroyFramebuffer(device, framebuffer, nullptr);
+		}
+
 		vkDestroyPipeline(device, graphicsPipeline, nullptr);
 		vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
 		vkDestroyRenderPass(device, renderPass, nullptr);
@@ -848,6 +961,7 @@ private:
 	VkSurfaceKHR surface;
 	VkDebugUtilsMessengerEXT debugMessenger;
 	// destroyed implicitly when instance is destroyed
+	QueueFamilyIndices currentQueueFamilyIndices;
 	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 	VkDevice device;
 	VkQueue graphicsQueue;
@@ -861,6 +975,9 @@ private:
 	VkPipelineLayout pipelineLayout;
 
 	VkPipeline graphicsPipeline;
+	std::vector<VkFramebuffer> swapChainFramebuffers;
+	VkCommandPool commandPool;
+	VkCommandBuffer commandBuffer;
 
 	const uint32_t WIDTH = 800;
 	const uint32_t HEIGHT = 600;

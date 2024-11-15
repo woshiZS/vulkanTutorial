@@ -109,10 +109,34 @@ FIFO会等待下一个vertical blank的到来再去切换显示的data source.
 ### Render Passes
 
 * 在创建pipeline之前，我们需要告诉vulkan需要的framebuffer attachment信息（不太懂教程为什么把这段放在pipeline后面）
+* 每个renderpass需要绑定一系列的attachments以及对应的subpass
 
-​	
+## Drawing
 
+### Framebuffers
 
+在最终绘制之前，还需要将每个swapchain中的imageView包一下，framebuffer正是这样一个wrapper.
 
+### Command buffers
 
+* Vulkan中draw不是简单的function call，需要把draw command记录在command buffer object中，然后递交进行绘制。
+* 每一个command pool只能递交一种类型的command，所以在创建command pool的时候需要制定command pool对应的queueFamily index。
 
+* command buffer allocation: 与其他struct类似，但是不叫xxxCreateInfo, 叫```VkCommandBufferAllocateInfo```，其余和其他类似结构创建类似。
+* 需要注意```VkCommandBufferAllocateInfo.level```， 分为PRIMARY和SECONDARY，只有primary才可以直接递交到队列中执行，second可以被primary所引用，可以作为复用部分。
+* command buffer recording: 主要就是flags这个标记需要注意一下，one_time_submit_bit, render_pass_continue_bit, simultaneous_use_bit，分别对应不同的使用场景。
+* 另外值得注意的成员是```pInheritanceInfo```, 这仅仅与secondary command buffer相关，描述的是从primary command buffer中继承的属性。
+* 如果一个command buffer已经被record过了， 那么vkBeginCommandBuffer将重置这个command buffer，这意味着不能通过这种方法去重置command，因为你的command buffer已经递交了。
+* starting a renderpass: 绘制从```vkCmdBeginRenderPass```开始，配置结构为```VkRenderPassBeginInfo```.可以总结出需要先beginCommandBuffer, 然后vkCmdBeginRenderPass，一般来说record command都是vkCmd打头。
+* Basic Drawing Commands: 
+  * vkCmdBindPipeline
+  * vkCmdSetViewport
+  * vkCmdSetScissor
+  * vkCmdDraw
+    * `vertexCount`: Even though we don't have a vertex buffer, we technically still have 3 vertices to draw.
+    * `instanceCount`: Used for instanced rendering, use `1` if you're not doing that.
+    * `firstVertex`: Used as an offset into the vertex buffer, defines the lowest value of `gl_VertexIndex`.
+    * `firstInstance`: Used as an offset for instanced rendering, defines the lowest value of `gl_InstanceIndex`.
+* 最后需要```vkEndCommandBuffer```收尾，这个函数是由返回值的，可以由此判断command record是否成功。
+
+### Rendering and Presentation
