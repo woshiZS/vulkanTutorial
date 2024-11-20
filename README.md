@@ -140,3 +140,53 @@ FIFO会等待下一个vertical blank的到来再去切换显示的data source.
 * 最后需要```vkEndCommandBuffer```收尾，这个函数是由返回值的，可以由此判断command record是否成功。
 
 ### Rendering and Presentation
+
+* Outline of a Frame(由以下几个部分组成):
+
+  * Wait for the previous frame to finish(我觉得这里不准确，不一定要等待，如果swapchain比较大，或者上屏比draw快)
+  * Acquire an image from the swap chain
+  * Record a command buffer which draws the scene onto that image
+  * Submit the recorded command buffer
+  * Present the swap chain image
+
+* Synchronization（GPU操作需要显示同步）
+
+  * 很多操作都是异步的，因此需要我们手动去做同步（我的理解是手动去做fence，例如某个操作需要在另外一个操作之后执行，这时候就需要semaphore之类的同步原语，做一个生产者消费者之类机制，当然这只是一个简单例子）
+
+  * vk function call是异步的，我们call一个function，他只是dispatch这个job给gpu去做，但实际上做没做完这个function call是不管的，所以function call的result需要手动查询。
+
+  * draw triangle中需要手动同步的操作（因为这些操作都happen on GPU)
+
+    * Acquire an image from the swap chain
+    * Execute commands that draw onto the acquired image
+    * Present that image to the screen for presentation, returning it to the swapchain(两步操作，swapchainImage->screen, return image to swapchain)
+
+  * Semaphores
+
+    * 两个种类，一个是binary semaphore, 另外一个是timeline semaphore，前者只有0，1的机制，后者就是一个uint64，到reference value触发特定的操作。
+    * 教程主要介绍的是binary semaphore，初始化为unsignaled， 一个queue option结束之后，给另外一个wait的queue发信号，另一个wait的queue发现semaphore被signaled之后开始执行，执行完然后再次将semaphore设置为unsignaled状态。
+    * **这里其实有一个问题，不太知道GPU同步的具体机制，semaphore是global还是说两个queue相当于两个thread的概念**
+
+  * Fences
+
+    * cpu同步gpu的信息需要用到这个（cpu需要知道gpu上的某件事已经做完了）
+
+    * attach fence obj to queue work, and wait the fence to be signaled on cpu.
+
+      ```cpp
+      VkCommandBuffer A = ... // record command buffer with the transfer
+      VkFence F = ... // create the fence
+      
+      // enqueue A, start work immediately, signal F when done
+      vkQueueSubmit(work: A, fence: F)
+      
+      vkWaitForFence(F) // blocks execution until A has finished executing
+      
+      save_screenshot_to_disk() // can't run until the transfer has finished
+      ```
+
+    * 这种方式不是最优方式（自旋等待），应该是由一个信号去做这个事情，在等待期间去做别的事情，之后可能会提到其他的同步原语。
+
+  * Subpass dependencies
+
+    有点类似与shader graph，指定前面的subPass到哪个stage才可以结束，后面的subPass到哪个stage哪个操作才需要wait。
