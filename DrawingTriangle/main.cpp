@@ -459,7 +459,7 @@ private:
 			{
 				indices.presentFamily = i;
 			}
-			if (queueFamily.queueCount & VK_QUEUE_GRAPHICS_BIT)
+			if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
 			{
 				indices.graphicsFamily = i;
 			}
@@ -894,7 +894,7 @@ private:
 		beginInfo.flags = 0;
 		beginInfo.pInheritanceInfo = nullptr;
 
-		if (!vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
+		if (VkResult retVal = vkBeginCommandBuffer(commandBuffer, &beginInfo); retVal != VK_SUCCESS)
 		{
 			throw std::runtime_error("Failed to begin recording command buffer");
 		}
