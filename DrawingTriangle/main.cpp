@@ -135,23 +135,23 @@ private:
 		createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 		createInfo.pApplicationInfo = &appInfo;
 
-		uint32_t requestedExtensionCount = 0;
-		vkEnumerateInstanceExtensionProperties(nullptr, &requestedExtensionCount, nullptr);
+		uint32_t availableExtensionCount = 0;
+		vkEnumerateInstanceExtensionProperties(nullptr, &availableExtensionCount, nullptr);
 
-		std::vector<VkExtensionProperties> extensions(requestedExtensionCount);
+		std::vector<VkExtensionProperties> availableExtensions(availableExtensionCount);
 
-		vkEnumerateInstanceExtensionProperties(nullptr, &requestedExtensionCount, extensions.data());
+		vkEnumerateInstanceExtensionProperties(nullptr, &availableExtensionCount, availableExtensions.data());
 
 		std::cout << "available extensions:\n";
 
-		for (const auto& extension : extensions)
+		for (const auto& extension : availableExtensions)
 		{
 			std::cout << '\t' << extension.extensionName << '\n';
 		}
 
-		auto availableExtensions = getRequiredExtensions();
-		createInfo.enabledExtensionCount = availableExtensions.size();
-		createInfo.ppEnabledExtensionNames = availableExtensions.data();
+		auto requiredExtensions = getRequiredExtensions();
+		createInfo.enabledExtensionCount = requiredExtensions.size();
+		createInfo.ppEnabledExtensionNames = requiredExtensions.data();
 
 		VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
 
@@ -169,7 +169,7 @@ private:
 			createInfo.pNext = nullptr;
 		}
 
-		if (checkExtensions(extensions, availableExtensions.data(), availableExtensions.size()))
+		if (checkExtensions(availableExtensions, requiredExtensions.data(), requiredExtensions.size()))
 			std::cout << "All required Extensions are found!" << std::endl;
 		else
 		{
@@ -933,6 +933,8 @@ private:
 		// final draw commands
 		vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 
+		vkCmdEndRenderPass(commandBuffer);
+
 		if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
 		{
 			throw std::runtime_error("Failed to record render commands to command buffer");
@@ -1006,6 +1008,8 @@ private:
 			glfwPollEvents();
 			drawFrame();
 		}
+
+		vkDeviceWaitIdle(device);
 	}
 
 	void cleanup()
