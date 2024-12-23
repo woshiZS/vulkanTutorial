@@ -190,3 +190,42 @@ FIFO会等待下一个vertical blank的到来再去切换显示的data source.
   * Subpass dependencies
 
     有点类似与shader graph，指定前面的subPass到哪个stage才可以结束，后面的subPass到哪个stage哪个操作才需要wait。
+
+### A little Summary
+
+这么多set up，具体做了哪些事情呢？
+
+* 创建window(这里不同os上可能不一样)
+* 初始化vulkan
+  * 创建instance（program和vulkan API沟通的proxy)
+  * pick physical device(先枚举出所有的physical device，之后去检测每个device是否qualified，是否qualified的标准是，拥有所有需要的queue family；是否有我们需要的extension，swapChain support是否ok，例如present mode, swapchain formats以及一些details(extend2d)).
+  * create logical device(按需创建，指定我们需要的queue family, device feature, device extensions, 以及enable的layers，最后创建logical device)
+  * create swapchain(选择对应的format, present mode, extent2D以及和queue family的一系列设置，最后需要query到swapchain内部image的引用vkGetSwapchainImagesKHR)
+  * createImageViews：主要要在swapchainImage上面包一层，其实后面还会包一层来构成framebuffer。
+  * createRenderPass：我理解就是给定类似于render graph的流程以及每个subpass的资源，包括资源格式种种，细节之后可以继续深入了解。
+  * createGraphicPipeline：这里是设定的gpu管线的每个流程，包括program stage以及fixed function stage
+  * createFramebuffer: framebuffer就是在imageView上再包了一层
+  * createCommandPool: 根据需要的queue Family创建，比如教程中就是创建了graphic queue family的command Pool
+  * createCommandBuffer：在对command pool中，创建command buffer，之后的record以及submit都会使用这个buffer
+  * createSyncObjects： vulkan需要显示同步，包括gpu上的work同步，gpu和cpu上的work同步
+
+* mainLoop
+  * poolevent： 没什么好说的，每个窗口系统收集事件的方式
+  * drawFrame: 同步，record command buffer, submit and present
+    * 首先就是wait上一帧结束的fence，应该说上一帧command queue提交之后会设置为signaled的fence
+    * 之后就是record command buffer（大致的流程总结）
+      * Reset command buffer
+      * begin command buffer
+      * begin render pass
+      * set dynamic props
+      * vk cmd draw
+      * vk cmd end command buffer
+    * 填写command submit info
+      * 等待的信号量，stage mask，数量
+      * command buffer数量
+      * 结束的时候signal semaphore信息
+    * 最后递交也可以指定被signal的fence
+
+### Frames In Flight
+
+* 
