@@ -983,12 +983,13 @@ private:
 		uint32_t imageIndex;
 		VkResult result = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrmae], VK_NULL_HANDLE, &imageIndex);
 
-		if (result == VK_ERROR_OUT_OF_DATE_KHR)
+		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized)
 		{
 			recreateSwapChain();
+			framebufferResized = false;
 			return;
 		}
-		else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+		else if (result != VK_SUCCESS)
 		{
 			throw std::runtime_error("Failed to acquire swap chain images");
 		}
@@ -1033,7 +1034,7 @@ private:
 
 		if (result == VK_ERROR_OUT_OF_DATE_KHR || result != VK_SUBOPTIMAL_KHR || framebufferResized)
 		{
-			framebufferResized = true;
+			framebufferResized = false;
 			recreateSwapChain();
 		}
 		else if (result != VK_SUCCESS)
