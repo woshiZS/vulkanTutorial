@@ -205,8 +205,7 @@ FIFO会等待下一个vertical blank的到来再去切换显示的data source.
   * createRenderPass：我理解就是给定类似于render graph的流程以及每个subpass的资源，包括资源格式种种，细节之后可以继续深入了解。
   * createGraphicPipeline：这里是设定的gpu管线的每个流程，包括program stage以及fixed function stage
   * createFramebuffer: framebuffer就是在imageView上再包了一层
-  * createCommandPool: 根据需要的queue Family创建，比如教程中就是创建了graphic queue family的command Pool
-  * createCommandBuffer：在对command pool中，创建command buffer，之后的record以及submit都会使用这个buffer
+  * createCommandPool: 根据需要的queue Family创建，比如教程中就是创建了graphic queue family的command PoolshandBuffer：在对command pool中，创建command buffer，之后的record以及submit都会使用这个buffer
   * createSyncObjects： vulkan需要显示同步，包括gpu上的work同步，gpu和cpu上的work同步
 
 * mainLoop
@@ -226,6 +225,9 @@ FIFO会等待下一个vertical blank的到来再去切换显示的data source.
       * 结束的时候signal semaphore信息
     * 最后递交也可以指定被signal的fence
 
-### Frames In Flight
+### Frames In Flight  && Recreate Swapchain
 
-* 
+* 提高并行度，其实就是将同步的信号量以及command buffer都设置为大于一的数组，swapchain这里不设置是因为之前已经有设置过了(swapchain之前的数量就不是1， minImageCount + 1)？
+* 基础的同步使用```vkDeviceIdle```，还有```vkQueueIdle```之类的函数，之后可以拓展的时候去看。
+* 可以从```vkAcquireNextImageKHR```以及```VKQueuePresentKHR```获取swapchain不在匹配的信息，return value是```VK_ERROR_OUT_OF_DATA_KHR```或者```VK_SUBOPTIMAL_KHR```均可表示需要重新创建swapchain.,
+* swap chain extent需要non zero，因此没有对最小化进行额外处理会报swapchain extent为0的错误。
