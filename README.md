@@ -229,5 +229,21 @@ FIFO会等待下一个vertical blank的到来再去切换显示的data source.
 
 * 提高并行度，其实就是将同步的信号量以及command buffer都设置为大于一的数组，swapchain这里不设置是因为之前已经有设置过了(swapchain之前的数量就不是1， minImageCount + 1)？
 * 基础的同步使用```vkDeviceIdle```，还有```vkQueueIdle```之类的函数，之后可以拓展的时候去看。
-* 可以从```vkAcquireNextImageKHR```以及```VKQueuePresentKHR```获取swapchain不在匹配的信息，return value是```VK_ERROR_OUT_OF_DATA_KHR```或者```VK_SUBOPTIMAL_KHR```均可表示需要重新创建swapchain.,
+* 可以从```vkAcquireNextImageKHR```以及```VKQueuePresentKHR```获取swapchain不在匹配的信息，return value是```VK_ERROR_OUT_OF_DATA_KHR```或者```VK_SUBOPTIMAL_KHR```均可表示需要重新创建swapchain
 * swap chain extent需要non zero，因此没有对最小化进行额外处理会报swapchain extent为0的错误。
+
+## Vertex Buffers
+
+### Vertex Input Description
+
+* 首先就是layout qualifier, 有的数据类型会占据多个slot，注意下一个data的location qualifier就需要往后夺延几个了。
+* 2 types are needed: ```VkVertexInputBindingDescription```以及```VkVertexInputAttributeDescription```, 可以记后缀就好了，bindingDescription, attributeDescription
+* 可以这么理解，一个entry里面有几个数据（vertex, color, normal, uv），我们就需要几个attributeDescription.
+* 上述两个数据相当于告诉GPU怎么去提取数据，具体如何帮定数据在下一节提到
+
+### Vertex Buffer Creation
+
+* VK创建buffer使用的是一个通用的结构：```VkBufferCreateInfo```， 指定usage即可指定vertex buffer类型。
+* Vk中创建了buffer之后，还需要手动的去给buffer分配memory，第一步就是去query memory requirements： ```vkGetBufferMemoryRequirements```
+* 需要从物理设备中去query memory的properties, 然后从根据vertexBuffer中生成的```VKMemoryRequireMents```中获取memoryAllocation所需要的信息（size, memoryTypeIndex)
+* 拿到分配的memory之后，需要时用VkMapMemory和VkUnmapMemory来写buffer，这里引申出另外一个问题，往对应map的内存地址写数据，cpu可能不会马上拷贝，所以在申请memory的是memoryType需要具有coherent（强行同步）的flag bit。或者是每次在写buffer之后flush，并且在每次read buffer之前InvalidateMappedMemoryRanges
