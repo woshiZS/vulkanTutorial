@@ -69,9 +69,15 @@ struct Vertex
 
 const std::vector<Vertex> vertices =
 {
-	{{0.f, -0.5f}, {1.f, 1.f, 1.f}},
-	{{0.5f, 0.5f}, {0.f, 1.f, 0.f}},
-	{{-0.5f, 0.5f}, {0.f, 0.f, 1.f}}
+	{{-0.5f, -0.5f}, {1.0f, 0.f, 0.f}},
+	{{0.5f, -0.5f}, {0.f, 1.f, 0.f}},
+	{{0.5f, 0.5f}, {0.f, 0.f, 1.f}},
+	{{-0.5f, 0.5f}, {1.f, 1.f, 1.f}}
+};
+
+const std::vector<uint16_t> indices =
+{
+	0, 1, 2, 2, 3, 0
 };
 
 VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger)
@@ -161,6 +167,7 @@ private:
 		createFramebuffers();
 		createCommandPool();
 		createVertexBuffer();
+		createIndexBuffer();
 		createCommandBuffers();
 		createSyncObjects();
 	}
@@ -962,6 +969,26 @@ private:
 		vkFreeMemory(device, stagingBufferMemory, nullptr);
 	}
 
+	void createIndexBuffer()
+	{
+		VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+		VkBuffer stagingBuffer;
+		VkDeviceMemory stagingBufferMemory;
+		createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+		void* data;
+		vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+		memcpy(data, indices.data(), bufferSize);
+		vkUnmapMemory(device, stagingBufferMemory);
+
+		createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+
+		copyBuffer(stagingBuffer, indexBuffer, bufferSize);
+
+		vkDestroyBuffer(device, stagingBuffer, nullptr);
+		vkFreeMemory(device, stagingBufferMemory, nullptr);
+	}
+
 	void createFramebuffers()
 	{
 		swapChainFramebuffers.resize(swapChainImageViews.size());
@@ -1071,7 +1098,7 @@ private:
 		renderPassBeginInfo.pClearValues = &renderPassClearValue;
 
 		vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-		
+
 		// Bind the graphics pipeline
 		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
@@ -1084,7 +1111,7 @@ private:
 		viewport.minDepth = 0.f;
 		viewport.maxDepth = 1.f;
 		vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-		
+
 		VkRect2D scissor{};
 		scissor.offset = { 0, 0 };
 		scissor.extent = swapChainExtent;
@@ -1094,8 +1121,11 @@ private:
 		VkDeviceSize offset[] = { 0 };
 		vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offset);
 
+		vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+
 		// final draw commands
-		vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
+		// vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
+		vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
 		vkCmdEndRenderPass(commandBuffer);
 
@@ -1249,6 +1279,9 @@ private:
 		// once the buffer is destroyed, we should not free the underlying memory
 		vkFreeMemory(device, vertexBufferMemory, nullptr); 
 
+		vkDestroyBuffer(device, indexBuffer, nullptr);
+		vkFreeMemory(device, indexBufferMemory, nullptr);
+
 		vkDestroyCommandPool(device, commandPool, nullptr);
 
 		vkDestroyPipeline(device, graphicsPipeline, nullptr);
@@ -1294,6 +1327,8 @@ private:
 	// vertexBuffers
 	VkBuffer vertexBuffer;
 	VkDeviceMemory vertexBufferMemory;
+	VkBuffer indexBuffer;
+	VkDeviceMemory indexBufferMemory;
 
 	std::vector<VkSemaphore> imageAvailableSemaphores;
 	std::vector<VkSemaphore> renderFinishedSemaphores;
