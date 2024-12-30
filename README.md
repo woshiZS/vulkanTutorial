@@ -247,3 +247,16 @@ FIFO会等待下一个vertical blank的到来再去切换显示的data source.
 * Vk中创建了buffer之后，还需要手动的去给buffer分配memory，第一步就是去query memory requirements： ```vkGetBufferMemoryRequirements```
 * 需要从物理设备中去query memory的properties, 然后从根据vertexBuffer中生成的```VKMemoryRequireMents```中获取memoryAllocation所需要的信息（size, memoryTypeIndex)
 * 拿到分配的memory之后，需要时用VkMapMemory和VkUnmapMemory来写buffer，这里引申出另外一个问题，往对应map的内存地址写数据，cpu可能不会马上拷贝，所以在申请memory的是memoryType需要具有coherent（强行同步）的flag bit。或者是每次在写buffer之后flush，并且在每次read buffer之前InvalidateMappedMemoryRanges
+* 最后就是需要在每次record command buffer的时候去bind vertex buffer
+
+### Staging buffer
+
+- 初印象是看上去，不使用coherent mode（```VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT```是更加高效的方式），然后利用staging buffer做中转，而不是直接map到cpu端写vertex buffer的方式。
+- 需要用到VK_BUFFER_USAGE_TRANSFER_BIT_SRC和VK_BUFFER_USAGE_TRANSFER_BIT_DST这俩flag，actual vertex buffer设置为device local，staging buffer才需要和cpu端进行同步
+- 如果创建vkdevice时候，用到了专门的transfer queue，可以额外创建一个command pool，这样可以对copy memory时memory allocation这一步进行优化
+- 继续重复一下cmd buffer的流程，alloc->begin record->record anything you want(vkcmdxxx, vkcmdxx)->vkqueuesubmit ->wait the cmd to finish->free the command buffers, as well as any resources you've allocated.
+
+### Index Buffer
+
+* 概念其实无需多提，学gl的时候已经接触过了，主要熟悉一下API的流程
+* 关于资源创建，有一点比较重要，教程中是分开创建buffer，然后offset都为0，但是其实更加高效的方式是创建一个buffer,然后不同的offset，代表不同的数据。甚至两个不同时使用的资源可以使用相同位置的数据（很多vk函数会一些特定的flag来指定这种用法）。
