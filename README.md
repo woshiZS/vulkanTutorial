@@ -260,3 +260,71 @@ FIFO会等待下一个vertical blank的到来再去切换显示的data source.
 
 * 概念其实无需多提，学gl的时候已经接触过了，主要熟悉一下API的流程
 * 关于资源创建，有一点比较重要，教程中是分开创建buffer，然后offset都为0，但是其实更加高效的方式是创建一个buffer,然后不同的offset，代表不同的数据。甚至两个不同时使用的资源可以使用相同位置的数据（很多vk函数会一些特定的flag来指定这种用法）。
+
+## Uniform Buffers
+
+> 围绕resource descriptor这个概念展开:
+>
+> * descriptor layout(给出resource的类型，内存排布)
+> * Allocate a descriptor set from a descriptor pool（descriptor set这里对应的具体buffer, uniform buffer object是众多descriptors中的一种)
+> * bind the descriptor set
+
+### Descriptor Layout
+
+每个VkPipelineLayoutCreateInfo会包含多个descriptor set layout, 每个VkDescriptorSetLayout对应多个bindings，这么设计的原因还不清楚。
+
+### Uniform buffer
+
+给实际的descriptor set数据创建容器(buffer handle, device memory, mapped to host end pointers)
+
+### Descriptor set(create Pool and set instance)
+
+* 通过descriptor pool创建descriptor set
+* 比较重要的一点是手动设定alignment, 不清楚可以去回顾一下。
+* 这边笔记没有记录得很全，可以之后回顾的时候再次
+
+## Texture Mapping
+
+### Images
+
+添加图片需要如下几个步骤：
+
+1. create image object(backed by device memory)
+2. Fill this image object with pixel data from image file
+3. create an image sampler
+4. add a combined image sampler(我的理解是descriptor和image sampler相结合)
+
+* 首先第一二步，可以像vertex buffer一样创建一个stage image object，map一下，再写入。也可以直接创建一个vkbuffer，将pixel数据写入到buffer中，然后再从buffer拷贝到image object.
+* 另外需要注意的点是image layout，不同的layout performance差异比较大
+  * VK_IMAGE_LAYOUT_PRESENT_SRC_KHR: best for presentation
+  * VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL: best for writing colors
+  * VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL: 最适合用于采样
+* pipeline barrier: 用于同步资源操作，在这里可以用于同步image的layout变换，也可以transfer queue family ownership.
+* 可以将texture image object类比于Vkbuffer, 本质上是一个handle，对应的memory还需要手动分配，分配buffer的时候, 需要查询memoryType, 根据memoryType allocate不同类型的memory，最后将handle和memory进行绑定(同理，使用的最佳实践是一块memory对应多个handle，根据offset去确定绑定位置)
+* VkPhysicalDeviceMemoryProperties, 描述物理设备的内存类型，有VkMemoryType和VkMemoryHeap这两种，
+* 一般来说，提到sharing mode，都是和queue访问有关，如果是exclusive，那么就不能并发访问，反之可以并发访问
+* VkCommandBufferUsageFlagBits, 指定commandBuffer的使用方式（目前理解是这样），VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, 每次结束都要提交，并且下次需要重新record, VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT用于secondary commandBuffer, 目前还未使用过。VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT ，可以被重复提交，目前还未使用过
+* VkImageMemoryBarrier中的queueFamilyIndex用于queue family ownership的转换，转换Image layout不需要这个flag, 并且需要手动设置。
+* memory同步用到的都是同一个vkCmdPipelineBarrier方法，其中根据barrier的src和dst access mask来确定，调用该方法时设定的src和dst pipeline stage
+* 使用memory barrier进行image layout transition的时候，需要指定src和dst pipelinestage，其中VK_PIPELINE_STAGE_TRANSFER_BIT需要指定，但实际上它并不是实际的管线stage， 而是一个虚拟的stage。
+* 教程中的layout transition以及copy buffer to image都是分开用一个单独的command buffer来做的，但是，使用一个单独command buffer去做，效率会更高，有时间可以看一下怎么做。
+
+### Image View and Sampler
+
+* 与swapchain类似，访问texture Image的方式也是创建一个image View，而非直接访问，创建过程主要就是填充一个VkImageViewCreateInfo
+* Samplers, 相当于再textures的基础上做filtering（bilinear, trilinear）和transformation(UV addressing mode)
+* 创建sampler, 需要填充一个VkSamplerCreateInfo
+  * 需要指定magFilter, minFilter，分别对应oversample和under sample的问题。
+  * 指定各向异性的数据，可以查询物理设备的限制
+  * unnormalizedCoordinates （uv是否normalized)
+  * compareEnable&&compareOp，和PCF有关，关于gpu gems里面具体的算法还没看懂
+  * mipmap相关，Mode,Bias, min, max限制
+* Vulkan当中sampler和image是若绑定关系，也就是说一个sampler可以采样2d texture，也可以采样3d texture
+* 最后一点需要注意的就是，需要在createLogicalDevice以及挑选物理设备的函数中，分别在VkPhysicalDeviceFeatures中设置samplerAnisotropy为true
+
+
+
+
+
+
+
