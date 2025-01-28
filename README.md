@@ -280,6 +280,54 @@ FIFO会等待下一个vertical blank的到来再去切换显示的data source.
 ### Descriptor set(create Pool and set instance)
 
 * 通过descriptor pool创建descriptor set
+* 创建descriptor需要指定一系列的VkDescriptorPoolSize，每个这种结构体指定了一种descriptor type以及该种类descriptor set的数量，所以每种类型多少个在pool创建的时候都需要指定好。
+* 创建DescriptorSet需要填充一个VkDescriptorSetAllocateInfo, 需要提供descriptorPool, 分配数量，descriptorSetLayout（写了分配多少个，就需要给定多少个layout)
+* 同时，call vkAllocatedescriptorSet的时候也要给定一定数量的handles去hold这些set
+* descriptor set 无需显示销毁，会随着descriptor pool的销毁而自动销毁
+* 创建完descriptorset之后，还需要绑定实际的数据，例如uniform buffer的绑定需要VkDescriptorBufferInfo, 绑定image需要VkDescriptorImageInfo.最后使用到一个VkWriteDescriptorSet
+
+```cpp
+VkDescriptorBufferInfo bufferInfo;
+bufferInfo.buffer = <targetBuffer>;
+bufferInfo.offset = <your_offset>;
+bufferInfo.range = sizeof(<your_struct>);
+
+VkWriteDescriptorSet descriptorWriteInfo;
+descriptorWriteInfo.sType = ...;
+descriptorWriteInfo.dstSet = <target_descriptor_set>;
+descriptorWriteInfo.dstBinding = <binding_number_in_shader>;
+descriptorWriteInfo.dstArrayElement = 0; // if you use array uniform, you should specify the index, otherwise write 0 here.
+descriptorWriteInfo.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // descriptor set type(uniform buffer, texture image, or anything else)
+desccriptorWriteInfo.descriptorCount = 1; // use it in combination of dstArrayElement, can configured how many elements will be updated.
+descritptorWriteInfo.pBufferInfo = ...;
+descriptorWriteInfo.pImageInfo = ...;
+descriptorWriteInfo.pTexelBufferView = ...;
+
+VkUpdateDescritptorSets(device, 1, &desriptorWriteInfo, 0, nullptr); // if you need copy, you can use the last 2 parameters
+```
+
+* 做完这一步，其实还没有actually bind, 只是将buffer中的数据同步到descriptor set中，我们还剩下一步，将descriptor set的数据同步到shader端（对，就是如此复杂2333)
+
+```cpp
+vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
+```
+
+稍微补充一下这个bindDescriptorSets函数
+
+```cpp
+void vkCmdBindDescriptorSets(
+    VkCommandBuffer                             commandBuffer,
+    VkPipelineBindPoint                         pipelineBindPoint,
+    VkPipelineLayout                            layout,
+    uint32_t                                    firstSet,
+    uint32_t                                    descriptorSetCount,
+    const VkDescriptorSet*                      pDescriptorSets,
+    uint32_t                                    dynamicOffsetCount,
+    const uint32_t*                             pDynamicOffsets);
+```
+
+第一个无需解释，需要绑定到的command buffer, 第二个是绑定的管线类型（graphic, compute, raytracing之类的），layout是通过pipelineLayoutInfo创建的VkPipelineLayout对象（任何获取descriptor sets的方式都要经过这个pipeline layout),
+
 * 比较重要的一点是手动设定alignment, 不清楚可以去回顾一下。
 * 这边笔记没有记录得很全，可以之后回顾的时候再次
 
@@ -322,9 +370,7 @@ FIFO会等待下一个vertical blank的到来再去切换显示的data source.
 * Vulkan当中sampler和image是若绑定关系，也就是说一个sampler可以采样2d texture，也可以采样3d texture
 * 最后一点需要注意的就是，需要在createLogicalDevice以及挑选物理设备的函数中，分别在VkPhysicalDeviceFeatures中设置samplerAnisotropy为true
 
+### Combined image sampler
 
-
-
-
-
-
+* Image sampler 同样通过descriptor set 方式被shader 访问，因此使用sampler的流程和普通uniform buffer类似（创建新的descriptorSetLayout, 创建descriptor pool, 创建descriptor set, 绑定image和descriptor set
+* **比较重要的一点，如果同时分配多个binding，其实还是一个descriptorSet, 只不过在创建layout的时候会指定多个binding info**
