@@ -5,15 +5,19 @@
 #include <GLFW/glfw3native.h>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_ENABLE_EXPERIMENTAL
 
 #include <iostream>
 #include <fstream>
 #include <stdexcept>
 #include <cstdlib>
 #include <vector>
+#include <unordered_map>
 #include <set>
 #include <optional>
 #include <limits>
@@ -21,6 +25,7 @@
 #include <format>
 #include <glm.hpp>
 #include <gtc/matrix_transform.hpp>
+#include <gtx/hash.hpp>
 #include <chrono>
 #include <array>
 
@@ -77,17 +82,34 @@ struct Vertex
 
 		return attributeDescriptions;
 	}
+
+	bool operator==(const Vertex& other) const
+	{
+		return pos == other.pos && color == other.color && texCoord == other.texCoord;
+	}
 };
 
-const std::vector<Vertex> vertices = {
-	{ { -0.5f, -0.5f, 0.f }, { 1.0f, 0.f, 0.f }, { 1.0f, 0.f } },	{ { 0.5f, -0.5f, 0.f }, { 0.f, 1.f, 0.f }, { 0.f, 0.f } },
-	{ { 0.5f, 0.5f, 0.f }, { 0.f, 0.f, 1.f }, { 0.f, 1.f } },		{ { -0.5f, 0.5f, 0.f }, { 1.f, 1.f, 1.f }, { 1.f, 1.f } },
-
-	{ { -0.5f, -0.5f, -0.5f }, { 1.0f, 0.f, 0.f }, { 1.0f, 0.f } }, { { 0.5f, -0.5f, -0.5f }, { 0.f, 1.f, 0.f }, { 0.f, 0.f } },
-	{ { 0.5f, 0.5f, -0.5f }, { 0.f, 0.f, 1.f }, { 0.f, 1.f } },		{ { -0.5f, 0.5f, -0.5f }, { 1.f, 1.f, 1.f }, { 1.f, 1.f } }
+namespace std
+{
+template <>
+struct hash<Vertex>
+{
+	size_t operator()(Vertex const& vertex) const
+	{
+		return ((hash<glm::vec3>()(vertex.pos) ^ (hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^ (hash<glm::vec2>()(vertex.texCoord) << 1);
+	}
 };
+}
 
-const std::vector<uint16_t> indices = { 0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4 };
+// const std::vector<Vertex> vertices = {
+//	{ { -0.5f, -0.5f, 0.f }, { 1.0f, 0.f, 0.f }, { 1.0f, 0.f } },	{ { 0.5f, -0.5f, 0.f }, { 0.f, 1.f, 0.f }, { 0.f, 0.f } },
+//	{ { 0.5f, 0.5f, 0.f }, { 0.f, 0.f, 1.f }, { 0.f, 1.f } },		{ { -0.5f, 0.5f, 0.f }, { 1.f, 1.f, 1.f }, { 1.f, 1.f } },
+//
+//	{ { -0.5f, -0.5f, -0.5f }, { 1.0f, 0.f, 0.f }, { 1.0f, 0.f } }, { { 0.5f, -0.5f, -0.5f }, { 0.f, 1.f, 0.f }, { 0.f, 0.f } },
+//	{ { 0.5f, 0.5f, -0.5f }, { 0.f, 0.f, 1.f }, { 0.f, 1.f } },		{ { -0.5f, 0.5f, -0.5f }, { 1.f, 1.f, 1.f }, { 1.f, 1.f } }
+//};
+//
+// const std::vector<uint16_t> indices = { 0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4 };
 
 struct UniformBufferObject
 {
@@ -187,6 +209,7 @@ private:
 		createTextureImage();
 		createTextureImageView();
 		createTextureSampler();
+		loadModel();
 		createVertexBuffer();
 		createIndexBuffer();
 		createUniformBuffers();
@@ -1124,7 +1147,8 @@ private:
 	void createTextureImage()
 	{
 		int texWidth, texHeight, texChannels;
-		stbi_uc* pixels = stbi_load("textures/statue.jpg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+		// const char* imagePath = "textures/statue.jpg";
+		stbi_uc* pixels = stbi_load(TEXTURE_PATH.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
 		VkDeviceSize imageSize = static_cast<uint64_t>(texWidth) * texHeight * 4;
 
 		if (!pixels)
@@ -1272,6 +1296,48 @@ private:
 
 		vkDestroyBuffer(device, stagingBuffer, nullptr);
 		vkFreeMemory(device, stagingBufferMemory, nullptr);
+	}
+
+	void loadModel()
+	{
+		tinyobj::attrib_t attrib;
+		std::vector<tinyobj::shape_t> shapes;
+		std::vector<tinyobj::material_t> materials;
+		std::string warn, err;
+
+		if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, MODEL_PATH.c_str()))
+		{
+			throw std::runtime_error(warn + err);
+		}
+
+		std::unordered_map<Vertex, uint32_t> uniqueVertices;
+
+		for (const auto& shape : shapes)
+		{
+			for (const auto& index : shape.mesh.indices)
+			{
+				Vertex vertex{};
+				// vertices.push_back(vertex);
+				// indices.push_back(indices.size());
+
+				vertex.pos = {
+					attrib.vertices[3 * index.vertex_index + 0],
+					attrib.vertices[3 * index.vertex_index + 1],
+					attrib.vertices[3 * index.vertex_index + 2],
+				};
+
+				vertex.texCoord = { attrib.texcoords[2 * index.texcoord_index + 0], 1.0f - attrib.texcoords[2 * index.texcoord_index + 1] };
+
+				vertex.color = { 1.f, 1.f, 1.f };
+
+				if (uniqueVertices.count(vertex) == 0)
+				{
+					uniqueVertices[vertex] = static_cast<uint32_t>(indices.size());
+					vertices.push_back(vertex);
+				}
+				indices.push_back(uniqueVertices[vertex]);
+			}
+		}
 	}
 
 	void createIndexBuffer()
@@ -1551,7 +1617,7 @@ private:
 		VkDeviceSize offset[] = { 0 };
 		vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offset);
 
-		vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+		vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
 		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0,
 								nullptr);
@@ -1590,13 +1656,12 @@ private:
 		VkResult result =
 			vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
-		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized)
+		if (result == VK_ERROR_OUT_OF_DATE_KHR)
 		{
 			recreateSwapChain();
-			framebufferResized = false;
 			return;
 		}
-		else if (result != VK_SUCCESS)
+		else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
 		{
 			throw std::runtime_error("Failed to acquire swap chain images");
 		}
@@ -1799,6 +1864,8 @@ private:
 	std::vector<VkCommandBuffer> commandBuffers;
 
 	// vertexBuffers
+	std::vector<Vertex> vertices;
+	std::vector<uint32_t> indices;
 	VkBuffer vertexBuffer;
 	VkDeviceMemory vertexBufferMemory;
 	VkBuffer indexBuffer;
@@ -1825,6 +1892,9 @@ private:
 
 	const uint32_t WIDTH = 800;
 	const uint32_t HEIGHT = 600;
+
+	const std::string MODEL_PATH = "models/viking_room.obj";
+	const std::string TEXTURE_PATH = "textures/viking_room.png";
 
 	const std::vector<const char*> validationLayers = { "VK_LAYER_KHRONOS_validation" };
 

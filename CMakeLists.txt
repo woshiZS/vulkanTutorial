@@ -20,6 +20,7 @@ message(STATUS "Vulkan Include dirs: ${Vulkan_INCLUDE_DIRS} and libs: ${LIBS}")
 include_directories("lib/glfw/include")
 include_directories("lib/glm")
 include_directories("lib/stb")
+include_directories("lib/objLoader")
 add_subdirectory("lib/glm")
 
 # set_property(GLOBAL PROPERTY DLL_DIRECTORY "${CMAKE_SOURCE_DIR}/lib/glfw/lib-vc2019")
