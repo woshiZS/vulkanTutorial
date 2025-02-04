@@ -1317,8 +1317,6 @@ private:
 			for (const auto& index : shape.mesh.indices)
 			{
 				Vertex vertex{};
-				// vertices.push_back(vertex);
-				// indices.push_back(indices.size());
 
 				vertex.pos = {
 					attrib.vertices[3 * index.vertex_index + 0],
@@ -1332,10 +1330,12 @@ private:
 
 				if (uniqueVertices.count(vertex) == 0)
 				{
-					uniqueVertices[vertex] = static_cast<uint32_t>(indices.size());
+					uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
 					vertices.push_back(vertex);
 				}
 				indices.push_back(uniqueVertices[vertex]);
+				// vertices.push_back(vertex);
+				// indices.push_back(indices.size());
 			}
 		}
 	}
