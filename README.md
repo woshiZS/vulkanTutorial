@@ -374,3 +374,19 @@ void vkCmdBindDescriptorSets(
 
 * Image sampler 同样通过descriptor set 方式被shader 访问，因此使用sampler的流程和普通uniform buffer类似（创建新的descriptorSetLayout, 创建descriptor pool, 创建descriptor set, 绑定image和descriptor set
 * **比较重要的一点，如果同时分配多个binding，其实还是一个descriptorSet, 只不过在创建layout的时候会指定多个binding info**
+
+### Depth Buffer
+
+* 在讲到depthBuffer的Image transition时，还是用memoryBarrier去做layout同步，此时的destination stage是early_fragment_tests_bits， 就是early-z(只走一遍MVP的vs，以及啥也不干的fs)，因为这是最早有可能用到depth buffer的pipeline stage
+* 关于early-z，有时候会与硬件有关，和discard以及手动写入```gl_FragDepth```互斥, 显示使用需指定关键字```layout(early_fragment_tests) in;```
+
+### Mipmap Generation·
+
+* 主要是针对createImage, createImageView, 以及transitionImageLayout的变化，对应info的levelCount做出对应修改
+* 第一步相当于生成了多个mipLevel的handle(或者说容器），因此，还需要额外的操作将数据传递到不同的mipLevel容器中，这里使用的是```vkCmdBlitImage```
+* 不同的mipmapLevel可以设置不同的imageLayout.
+* ```VkImageBlit```里的两个offset指代的是三维空间中的cube的两个对角点
+* 生成mipmap的方式出了单张load，一层一层传一层之外，还可以load之后，用resize的方式，或者是资源文件中已经存储好了mipMap的信息，load的时候从buffer中拷贝到image中。
+* ```VkSampler```最终控制采样的mipmapLevel信息
+* 如果执行vkCmdPipelineBarrier的时候barrier指定的layout信息和实际image的layout信息不符，validation layer也会报错。
+
