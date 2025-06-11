@@ -395,3 +395,7 @@ void vkCmdBindDescriptorSets(
 * 改动需要同步到createRenderPass和createFramebuffers
 * 出了colorAttachment的msaa之外，shader aliasing也是一个问题，可以通过开启Sample Shading的方法来减小shading走样。需要两个步骤（logic device创建的时候开启```sampleRateShading```，第二个就是在创建管线的时候在multisampleInfo中k开启```sampleShadingEnable```以及指定```minSampleShading```
 
+### Compute Shader
+
+* work groups具有两个属性，global size和local size，共同决定invocation的数量
+* 先写image(单层texture，并且同时可以读写)，再读image, 需要用到memoryBarrier，gl中的memory Barrier相当于在cpu端划了一道线，规定类型的操作在这条线之后的指令会等待线之前的指令执行完毕。
