@@ -26,6 +26,7 @@ add_subdirectory("lib/glm")
 # set_property(GLOBAL PROPERTY DLL_DIRECTORY "${CMAKE_SOURCE_DIR}/lib/glfw/lib-vc2019")
 # list(APPEND CMAKE_PROGRAM_PATH "${CMAKE_SOURCE_DIR}/lib/glfw/lib-vc2019")
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/lib/glfw/lib-vc2019")
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 add_subdirectory(DrawingTriangle)
 add_subdirectory(vulkanSample)
