@@ -28,3 +28,4 @@ add_subdirectory("lib/glm")
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/lib/glfw/lib-vc2019")
 
 add_subdirectory(DrawingTriangle)
+add_subdirectory(TemplateDev)
