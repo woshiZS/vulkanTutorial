@@ -16,6 +16,7 @@
 
 * 仅仅swapChain Extension存在是不够的，还需要检查swapChain是否和window surface适配，一般从三个方面进行detailed checking:
   * Basic surface capabilties(surface最大最小数量，surface image的最大最小宽高)
+    * maxImageCount为0表示没有最大限制
   * Surface format(pixel format, color space, etc)
   * Presentation modes(**这个尤为重要**)
 * 查询extension support的过程是类似的，需要注意的是只有extension支持了，我们才需要去看device是否有和surface相符的swapchain，因此swapchain support的检查需要放在extension检查后面，extension检查好了以后，我们才需要检查swapchain support。
@@ -116,6 +117,8 @@ FIFO会等待下一个vertical blank的到来再去切换显示的data source.
 ### Framebuffers
 
 在最终绘制之前，还需要将每个swapchain中的imageView包一下，framebuffer正是这样一个wrapper.
+
+color buffer, depth buffer都只是framebuffer中的attachment之一。
 
 ### Command buffers
 
@@ -399,3 +402,9 @@ void vkCmdBindDescriptorSets(
 
 * work groups具有两个属性，global size和local size，共同决定invocation的数量
 * 先写image(单层texture，并且同时可以读写)，再读image, 需要用到memoryBarrier，gl中的memory Barrier相当于在cpu端划了一道线，规定类型的操作在这条线之后的指令会等待线之前的指令执行完毕。
+
+## Getting Data Back
+
+* query需要用query object来管理，没一个query object都是用pool来管理，不能是单个管理
+  * ```VkQueryPoolCreateInfo```，比较重要得是query type，其中包括，```VK_QUERY_TYPE_OCCLUSION```,```VK_QUERY_TYPE_PIPELINE_STATISTICS```
+
